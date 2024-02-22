@@ -1,0 +1,23 @@
+package {{ package }};
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("{{ request_mapping }}")
+public class {{ controller_name }} {
+
+    @Autowired
+    private {{ service_name }} service;
+
+    {% for method, return_type, params, http_method in methods %}
+    @{{ http_method }}Mapping("/{{ method }}")
+    public {{ return_type if return_type else 'void' }} {{ method }}({% for type, name, annotation in params %}{{ annotation }} {{ type }} {{ name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+        {% if return_type %}
+        return service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
+        {% else %}
+        service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
+        {% endif %}
+    }
+    {% endfor %}
+}
