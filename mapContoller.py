@@ -3,11 +3,12 @@ import sys
 import inspect
 from jinja2 import Environment, FileSystemLoader
 import javalang
+from collections import defaultdict
 # Asegúrate de que Python pueda encontrar tus módulos de servicio
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\inv'
+SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
 
 # Paso 1: Extraer la base del directorio y las partes específicas
 base_dir = SERVICE_DIR.split('erp-negocio')[0]  # Obtiene la base hasta 'erp-negocio'
@@ -18,7 +19,7 @@ specific_part = specific_part.replace('negocio', 'controller')
 
 # Paso 3: Construir el nuevo directorio para CONTROLLER_DIR
 CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
-
+#CONTROLLER_DIR = "./repuest"
 print(CONTROLLER_DIR)
 
 
@@ -79,36 +80,68 @@ def get_service_methods(service_path):
 
     return package_name, methods_info
 
+def adjust_method_paths(methods_info):
+    """
+    Ajusta las rutas de los métodos para asegurar que sean únicas dentro del controlador.
+    Añade /v1, /v2, etc., a las rutas duplicadas.
+    """
+    path_counts = defaultdict(int)
+    adjusted_methods = []
 
+    for method, return_type, params, http_method in methods_info:
+        # Generar la ruta base del método (puede ser simplemente el nombre del método)
+        base_path = method.lower()
+        path_counts[base_path] += 1
+
+        # Comprobar si la ruta ya fue utilizada
+        if path_counts[base_path] > 1:
+            # Añadir el sufijo de versión si la ruta está duplicada
+            versioned_path = f"{base_path}/v{path_counts[base_path]}"
+        else:
+            versioned_path = base_path
+
+        # Añadir la información del método ajustado a la lista
+        adjusted_methods.append((method, return_type, params, http_method, versioned_path))
+
+    return adjusted_methods
 
 
 # Procesar cada archivo de servicio
-for service_file in os.listdir(SERVICE_DIR):
-    service_path = os.path.join(SERVICE_DIR, service_file)
-    if os.path.isfile(service_path) and service_file.endswith('.java'):
-        # Extraer nombres de métodos dinámicamente
-        package_name, methods = get_service_methods(service_path)
+for root, dirs, files in os.walk(SERVICE_DIR):
+    for service_file in files:
+        if service_file.endswith('.java'):
+            service_path = os.path.join(root, service_file)
+            # Extraer nombres de métodos dinámicamente
+            package_name, methods = get_service_methods(service_path)
 
-        if not methods:  # Si no hay métodos, continúa con el siguiente archivo
-            print(f"No se encontraron métodos en {service_file}, omitiendo...")
-            continue
+            if not methods:  # Si no hay métodos, continúa con el siguiente archivo
+                print(f"No se encontraron métodos en {service_file}, omitiendo...")
+                continue
 
-        controller_package = package_name.replace('negocio', 'controller')
-        service_name = service_file[:-5]  # Sin '.py'
-        controller_name = 'C' + service_name[1:]  # 'N' por 'C'
-        request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name
-        request_mapping = request_mapping.split('controller')[1]
-        # Renderizar plantilla
-        controller_content = template.render(
-            package=controller_package,
-            controller_name=controller_name,
-            service_name=service_name,
-            request_mapping=request_mapping,
-            methods=methods
-        )
-        if not os.path.exists(CONTROLLER_DIR):
-            os.makedirs(CONTROLLER_DIR)
-        # Guardar archivo de controlador generado
-        with open(os.path.join(CONTROLLER_DIR, controller_name + '.java'), 'w') as f:
-            f.write(controller_content)
-        print(f'Controlador generado: {controller_name}.java')
+            # A continuación, calculamos CONTROLLER_DIR basado en package_name
+            package_path = package_name.replace('.', '\\')  # Convertir el nombre del paquete a ruta de directorio
+            dynamic_controller_dir = os.path.join(base_dir, 'erp-rest\\src\\main\\java', package_path.replace('negocio', 'controller'))
+
+            if not os.path.exists(dynamic_controller_dir):
+                os.makedirs(dynamic_controller_dir)
+
+
+            controller_package = package_name.replace('negocio', 'controller')
+            service_name = service_file[:-5]  # Sin '.py'
+            controller_name = 'C' + service_name[1:]  # 'N' por 'C'
+            request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name
+            request_mapping = request_mapping.split('controller')[1]
+            adjusted_methods = adjust_method_paths(methods)
+            # Renderizar plantilla
+            controller_content = template.render(
+                package=controller_package,
+                controller_name=controller_name,
+                service_name=service_name,
+                request_mapping=request_mapping,
+                methods=adjusted_methods
+            )
+
+            # Guardar archivo de controlador generado en la ruta dinámica
+            with open(os.path.join(dynamic_controller_dir, controller_name + '.java'), 'w') as f:
+                f.write(controller_content)
+            print(f'Controlador generado: {controller_name}.java en {dynamic_controller_dir}')
