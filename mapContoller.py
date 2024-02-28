@@ -105,12 +105,27 @@ def adjust_method_paths(methods_info):
 
     return adjusted_methods
 
+def is_not_interface(java_file_path):
+    with open(java_file_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+    tree = javalang.parse.parse(content)
+
+    # Buscar nodos de tipo InterfaceDeclaration en el árbol
+    for _, node in tree.filter(javalang.tree.InterfaceDeclaration):
+        return False  # Si encuentra una declaración de interfaz, retorna False
+
+    return True  # Si no encuentra ninguna declaración de interfaz, retorna True
 
 # Procesar cada archivo de servicio
 for root, dirs, files in os.walk(SERVICE_DIR):
     for service_file in files:
+
         if service_file.endswith('.java'):
+
             service_path = os.path.join(root, service_file)
+            if(is_not_interface(service_path)):
+                print(f" {service_file}, No es una interface omitiendo...")
+                continue
             # Extraer nombres de métodos dinámicamente
             package_name, methods = get_service_methods(service_path)
 
