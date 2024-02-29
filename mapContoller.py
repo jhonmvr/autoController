@@ -19,6 +19,7 @@ specific_part = specific_part.replace('negocio', 'controller')
 
 # Paso 3: Construir el nuevo directorio para CONTROLLER_DIR
 CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
+FILE_IMPORTS = './correct_package_non_primitive_types.txt'
 #CONTROLLER_DIR = "./repuest"
 print(CONTROLLER_DIR)
 
@@ -28,6 +29,23 @@ sys.path.append(SERVICE_DIR)
 # Cargar plantilla
 env = Environment(loader=FileSystemLoader('.'), trim_blocks=True, lstrip_blocks=True)
 template = env.get_template(TEMPLATE_FILE)
+
+#METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO
+def read_all_imports():
+    """Lee todos los imports desde el archivo generado y los devuelve como un diccionario."""
+    imports_dict = {}
+    with open(FILE_IMPORTS, 'r') as f:
+        for line in f:
+            # Asume que el archivo tiene líneas que comienzan con 'import ' seguido por el tipo completo
+            if line.startswith('import '):
+                full_type = line.strip().split(' ')[1].rstrip(';')
+                simple_type = full_type.split('.')[-1]
+                imports_dict[simple_type] = full_type
+    return imports_dict
+
+# Al inicio del script, después de definir las constantes
+all_imports = read_all_imports()
+
 
 def format_type(node):
     """Formatea el tipo de nodo de javalang a una cadena adecuada para Java, incluidos los tipos genéricos."""
@@ -116,7 +134,7 @@ def is_not_interface(java_file_path):
 
     return True  # Si no encuentra ninguna declaración de interfaz, retorna True
 
-# Procesar cada archivo de servicio
+# Procesar cada archivo de servicio y crear los controladores en sus respectiva carpeta
 for root, dirs, files in os.walk(SERVICE_DIR):
     for service_file in files:
 
@@ -160,3 +178,5 @@ for root, dirs, files in os.walk(SERVICE_DIR):
             with open(os.path.join(dynamic_controller_dir, controller_name + '.java'), 'w') as f:
                 f.write(controller_content)
             print(f'Controlador generado: {controller_name}.java en {dynamic_controller_dir}')
+
+
