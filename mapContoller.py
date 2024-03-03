@@ -108,7 +108,7 @@ def adjust_method_paths(methods_info):
 
     for method, return_type, params, http_method in methods_info:
         # Generar la ruta base del método (puede ser simplemente el nombre del método)
-        base_path = method.lower()
+        base_path = method
         path_counts[base_path] += 1
 
         # Comprobar si la ruta ya fue utilizada
