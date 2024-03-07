@@ -128,9 +128,11 @@ def get_service_methods(service_path):
         return_type = format_type(node.return_type)
         params = []
         complex_params = []
+        params_all = []
         for param in node.parameters:
             param_type = format_type_param(param.type)
             # Verificar si el tipo es simple o complejo
+            params_all.append((param_type, param.name, ""))
             if param.type.name in simple_types:
                 annotation = f'@RequestParam("{param.name}")'
                 params.append((param_type, param.name, annotation))
@@ -155,7 +157,7 @@ def get_service_methods(service_path):
             # No hay parámetros complejos o solo uno, determinar el método HTTP basado en los parámetros existentes
             http_method = "Get" if all(param[2] == '@RequestParam' for param in params) else "Post"
 
-        methods_info.append((node.name, return_type, params, http_method))
+        methods_info.append((node.name, return_type, params, http_method,complex_params,params_all))
 
     return package_name, methods_info
 
@@ -167,7 +169,7 @@ def adjust_method_paths(methods_info):
     path_counts = defaultdict(int)
     adjusted_methods = []
 
-    for method, return_type, params, http_method in methods_info:
+    for method, return_type, params, http_method, complex_params, params_all in methods_info:
         # Generar la ruta base del método (puede ser simplemente el nombre del método)
         base_path = method
         path_counts[base_path] += 1
@@ -180,7 +182,7 @@ def adjust_method_paths(methods_info):
             versioned_path = base_path
 
         # Añadir la información del método ajustado a la lista
-        adjusted_methods.append((method, return_type, params, http_method, versioned_path))
+        adjusted_methods.append((method, return_type, params, http_method,complex_params, params_all, versioned_path))
 
     return adjusted_methods
 
@@ -206,6 +208,7 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 print(f" {service_file}, No es una interface omitiendo...")
                 continue
             # Extraer nombres de métodos dinámicamente
+
             package_name, methods = get_service_methods(service_path)
 
             if not methods:  # Si no hay métodos, continúa con el siguiente archivo
@@ -232,7 +235,7 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 controller_name=controller_name,
                 service_name=service_name,
                 request_mapping=request_mapping,
-                methods=adjusted_methods
+                methods=adjusted_methods,
             )
 
             # Guardar archivo de controlador generado en la ruta dinámica
