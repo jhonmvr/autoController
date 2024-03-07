@@ -8,8 +8,8 @@ from collections import defaultdict
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
-
+SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\bdg'
+#C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
 base_dir = SERVICE_DIR.split('erp-negocio')[0]  # Obtiene la base hasta 'erp-negocio'
 specific_part = SERVICE_DIR.split('erp-negocio\\src\\main\\java\\')[1]  # Obtiene la parte específica después de 'java\\'
@@ -19,7 +19,7 @@ specific_part = specific_part.replace('negocio', 'controller')
 
 # Paso 3: Construir el nuevo directorio para CONTROLLER_DIR
 CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
-FILE_IMPORTS = './correct_package_non_primitive_types.txt'
+FILE_IMPORTS = './imports.txt'
 #CONTROLLER_DIR = "./repuest"
 print(CONTROLLER_DIR)
 
@@ -37,37 +37,81 @@ def read_all_imports():
     with open(FILE_IMPORTS, 'r') as f:
         for line in f:
             # Asume que el archivo tiene líneas que comienzan con 'import ' seguido por el tipo completo
+            if line.startswith('import ') and 'tablas' in line and not 'enumeradores' in line:
+                full_type = line.strip().split(' ')[1].rstrip(';')
+                simple_type = full_type.split('.')[-1]
+                if not simple_type.startswith('Enum'):
+                    imports_dict[simple_type] = full_type
+    return imports_dict
+
+all_imports = read_all_imports()
+
+def read_all_Enum_in_imports():
+    """Lee todos los imports desde el archivo generado y los devuelve como un diccionario."""
+    imports_dict = {
+    "String",
+    "int", "long", "double", "float", "boolean", "char",
+    "Integer", "Long", "Double", "Float", "Boolean", "Character",
+    "byte", "short",
+    "Byte", "Short"
+    }
+
+    with open(FILE_IMPORTS, 'r') as f:
+        for line in f:
+            # Asume que el archivo tiene líneas que comienzan con 'import ' seguido por el tipo completo
             if line.startswith('import '):
                 full_type = line.strip().split(' ')[1].rstrip(';')
                 simple_type = full_type.split('.')[-1]
-                imports_dict[simple_type] = full_type
+                if simple_type.startswith('Enum'):
+                    imports_dict.add(simple_type)
     return imports_dict
-
+simple_types = read_all_Enum_in_imports()
+print("simple_types>>>>>>>>>>>>>>>>>>>>>>>>>>",simple_types)
 # Al inicio del script, después de definir las constantes
-all_imports = read_all_imports()
+
+#print("allimports",all_imports)
+def agregar_dto(arg):
+    if arg in all_imports:
+      return arg + 'Dto'
+    return arg
 
 
 def format_type(node):
-    """Formatea el tipo de nodo de javalang a una cadena adecuada para Java, incluidos los tipos genéricos."""
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
-            # Manejar tipos genéricos, ej. List<Long>
             args = [format_type(arg.type) for arg in node.arguments if arg.type is not None]
             generic_args = ", ".join(args)
-            return f"{node.name}<{generic_args}>"
-        return node.name
+            return f"{node.name}<{agregar_dto(generic_args)}>"
+        if node.dimensions:
+            # Handle arrays, even when ArrayType is not a separate class
+            return f"{agregar_dto(node.name)}{'[]' * len(node.dimensions)}"
+        return agregar_dto(node.name)
     elif isinstance(node, javalang.tree.BasicType):
-        # Tipos básicos como int, long, etc.
         return node.name
     elif node is None:
-        return None  # Caso para tipos void
+        return 'void'
     else:
-        # Por defecto, convertir el nodo a cadena (para manejar otros casos potenciales)
+        return str(node)
+
+def format_type_param(node):
+    if isinstance(node, javalang.tree.ReferenceType):
+        if node.arguments:
+            args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
+            generic_args = ", ".join(args)
+            return f"{node.name}<{generic_args}>"
+        if node.dimensions:
+            # Handle arrays, even when ArrayType is not a separate class
+            return f"{node.name}{'[]' * len(node.dimensions)}"
+        return node.name
+    elif isinstance(node, javalang.tree.BasicType):
+        return node.name
+    elif node is None:
+        return 'void'
+    else:
         return str(node)
 
 
 def get_service_methods(service_path):
-    """Extrae los nombres de los métodos, sus tipos de retorno, y parámetros de un archivo de servicio Java."""
     methods_info = []
     package_name = None
 
@@ -79,21 +123,38 @@ def get_service_methods(service_path):
     if tree.package:
         package_name = tree.package.name
 
-    # Definir tipos considerados como 'simples' o primitivos para @RequestParam
-    simple_types = {"String", "int", "long", "double", "float", "boolean", "Integer", "Long", "Double", "Float", "Boolean", "char", "Character"}
 
     for _, node in tree.filter(javalang.tree.MethodDeclaration):
         return_type = format_type(node.return_type)
         params = []
+        complex_params = []
         for param in node.parameters:
-            param_type = format_type(param.type)
-            # Si es un tipo simple, usamos @RequestParam con el nombre del parámetro
+            param_type = format_type_param(param.type)
+            # Verificar si el tipo es simple o complejo
             if param.type.name in simple_types:
                 annotation = f'@RequestParam("{param.name}")'
+                params.append((param_type, param.name, annotation))
             else:
-                annotation = "@RequestBody"
-            params.append((param_type, param.name, annotation))
-        http_method = "Post" if any(p[2] == "@RequestBody" for p in params) else "Get"
+                # Manejar parámetros complejos
+                complex_params.append((param_type, param.name))
+
+        # Si hay más de un parámetro complejo, encapsularlos en un mapa de parámetros
+        if len(complex_params) > 1:
+            # Asumiendo que quieres usar un DTO para esto, lo marcamos como tal.
+            # Deberías crear un DTO que encapsule estos parámetros en tu código Java.
+            annotation = "@RequestBody"
+            params.append(("Map<String, Object>", "body", annotation))
+            http_method = "Post"
+        elif len(complex_params) == 1:
+            # Solo un parámetro complejo, se maneja normalmente
+            param_type, param_name = complex_params[0]
+            annotation = "@RequestBody"
+            params.append((param_type, param_name, annotation))
+            http_method = "Post"
+        else:
+            # No hay parámetros complejos o solo uno, determinar el método HTTP basado en los parámetros existentes
+            http_method = "Get" if all(param[2] == '@RequestParam' for param in params) else "Post"
+
         methods_info.append((node.name, return_type, params, http_method))
 
     return package_name, methods_info

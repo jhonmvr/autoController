@@ -15,7 +15,7 @@ public class {{ controller_name }} {
     @{{ http_method }}Mapping("/{{ path }}")
     public {{ return_type if return_type else 'void' }} {{ method }}({% for param_type, param_name, annotation in params %}
         {{ annotation }} {{ param_type }} {{ param_name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-        {% if return_type %}
+        {% if return_type and return_type != 'void' %}
         return service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
         {% else %}
         service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
