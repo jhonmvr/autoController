@@ -9,6 +9,7 @@ from collections import defaultdict
 
 # Configuración
 SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\bdg'
+#SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios\\bdg'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
 base_dir = SERVICE_DIR.split('erp-negocio')[0]  # Obtiene la base hasta 'erp-negocio'
@@ -93,6 +94,45 @@ def format_type(node):
     else:
         return str(node)
 
+def agregar_mapper(arg):
+
+    return arg + 'Mapper'
+
+
+def format_type_to_mapper(node):
+    mappper = ""
+    if isinstance(node, javalang.tree.ReferenceType):
+        if node.arguments:
+            args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
+            generic_args = ", ".join(args)
+            mappper = generic_args
+    elif isinstance(node, javalang.tree.BasicType):
+        mappper = node.name
+    else:
+        mappper = str(node)
+    if mappper in all_imports:
+      return mappper + 'Mapper'
+    return None
+
+
+def format_type_to_mapper_toDto(node):
+    mappper = ""
+    if isinstance(node, javalang.tree.ReferenceType):
+        if node.arguments:
+            args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
+            generic_args = ", ".join(args)
+
+            if generic_args in all_imports:
+                return 'toDtoList'
+
+        mappper = node.name
+    else:
+        mappper = str(node)
+    if mappper in all_imports:
+      return 'toDto'
+    return None
+
+
 def format_type_param(node):
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
@@ -111,9 +151,12 @@ def format_type_param(node):
         return str(node)
 
 
+
+
 def get_service_methods(service_path):
     methods_info = []
     package_name = None
+    mappers = []
 
     with open(service_path, 'r', encoding='utf-8') as file:
         content = file.read()
@@ -157,9 +200,17 @@ def get_service_methods(service_path):
             # No hay parámetros complejos o solo uno, determinar el método HTTP basado en los parámetros existentes
             http_method = "Get" if all(param[2] == '@RequestParam' for param in params) else "Post"
 
-        methods_info.append((node.name, return_type, params, http_method,complex_params,params_all))
 
-    return package_name, methods_info
+        mapper_service = format_type_to_mapper(node.return_type)
+        mapper_name = None
+
+        if mapper_service:
+            mapper_name = mapper_service[0].lower() + mapper_service[1:]
+            mappers.append((mapper_service, mapper_name))
+
+        methods_info.append((node.name, return_type, params, http_method,complex_params,params_all,(mapper_name,format_type_to_mapper_toDto(node.return_type))))
+
+    return package_name, methods_info, mappers
 
 def adjust_method_paths(methods_info):
     """
@@ -169,7 +220,7 @@ def adjust_method_paths(methods_info):
     path_counts = defaultdict(int)
     adjusted_methods = []
 
-    for method, return_type, params, http_method, complex_params, params_all in methods_info:
+    for method, return_type, params, http_method, complex_params, params_all, toDto in methods_info:
         # Generar la ruta base del método (puede ser simplemente el nombre del método)
         base_path = method
         path_counts[base_path] += 1
@@ -182,7 +233,7 @@ def adjust_method_paths(methods_info):
             versioned_path = base_path
 
         # Añadir la información del método ajustado a la lista
-        adjusted_methods.append((method, return_type, params, http_method,complex_params, params_all, versioned_path))
+        adjusted_methods.append((method, return_type, params, http_method,complex_params, params_all, versioned_path,toDto))
 
     return adjusted_methods
 
@@ -209,7 +260,7 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 continue
             # Extraer nombres de métodos dinámicamente
 
-            package_name, methods = get_service_methods(service_path)
+            package_name, methods, mappers = get_service_methods(service_path)
 
             if not methods:  # Si no hay métodos, continúa con el siguiente archivo
                 print(f"No se encontraron métodos en {service_file}, omitiendo...")
@@ -224,8 +275,14 @@ for root, dirs, files in os.walk(SERVICE_DIR):
 
 
             controller_package = package_name.replace('negocio', 'controller')
-            service_name = service_file[:-5]  # Sin '.py'
-            controller_name = 'C' + service_name[1:]  # 'N' por 'C'
+            service_name = service_file[:-5]  # Sin '.java'
+            # 'N' por 'C' Servicio
+            if service_name.startswith('Servicio'):
+                controller_name = 'C' + service_name[8:]
+            if service_name.startswith('N'):
+                controller_name = 'C' + service_name[1:]
+
+
             request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name
             request_mapping = request_mapping.split('controller')[1]
             adjusted_methods = adjust_method_paths(methods)
@@ -236,6 +293,7 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 service_name=service_name,
                 request_mapping=request_mapping,
                 methods=adjusted_methods,
+                mappers= mappers
             )
 
             # Guardar archivo de controlador generado en la ruta dinámica

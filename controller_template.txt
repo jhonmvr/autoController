@@ -11,15 +11,21 @@ public class {{ controller_name }} {
     @Autowired
     private {{ service_name }} service;
 
-    {% for method, return_type, params, http_method, complex_params, params_all, path in methods %}
+    {% for service, name in mappers %}
+    @Autowired
+    protected {{ service }} {{ name }};
+    {% endfor %}
+
+    {% for method, return_type, params, http_method, complex_params, params_all, path, (nameMapper, tDto) in methods %}
     @{{ http_method }}Mapping("/{{ path }}")
     public {{ return_type if return_type else 'void' }} {{ method }}({% for param_type, param_name, annotation in params %}
         {{ annotation }} {{ param_type }} {{ param_name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+
         {% if complex_params|length > 1 %}
             // Desempaquetado de 'body' para parametros complejos
-            {% for tipo, nombre in complex_params %}
-            {{ tipo }} {{ nombre }} = ({{ tipo }}) body.get("{{ nombre }}");
-            {% endfor %}
+        {% for tipo, nombre in complex_params %}
+        {{ tipo }} {{ nombre }} = ({{ tipo }}) body.get("{{ nombre }}");
+        {% endfor %}
         {% endif %}
         {% if complex_params|length > 1 %}
         {% if return_type and return_type != 'void' %}
@@ -29,7 +35,12 @@ public class {{ controller_name }} {
         {% endif %}
         {% else %}
         {% if return_type and return_type != 'void' %}
+        {% if nameMapper %}
+        return {{nameMapper}}.{{tDto}}(service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}));
+        {% else %}
         return service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
+        {% endif %}
+
         {% else %}
         service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
         {% endif %}
