@@ -8,7 +8,7 @@ from collections import defaultdict
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\bdg'
+SERVICE_DIR = 'C:\\WORKSPACE\\erp-rest\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
 #SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios\\bdg'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
@@ -21,6 +21,7 @@ specific_part = specific_part.replace('negocio', 'controller')
 # Paso 3: Construir el nuevo directorio para CONTROLLER_DIR
 CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
 FILE_IMPORTS = './imports.txt'
+FILE_TABLAS_VACIAS = './tablas_vacias.txt'
 #CONTROLLER_DIR = "./repuest"
 print(CONTROLLER_DIR)
 
@@ -47,6 +48,19 @@ def read_all_imports():
 
 all_imports = read_all_imports()
 
+#METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO
+def read_all_tablas_vacias():
+    """Lee todos los imports desde el archivo generado y los devuelve como un diccionario."""
+    imports_dict = {}
+    with open(FILE_TABLAS_VACIAS, 'r') as f:
+        for line in f:
+            # Asume que el archivo tiene líneas que comienzan con 'import ' seguido por el tipo completo
+            imports_dict[line.strip()] = line.strip()
+    return imports_dict
+
+tablas_vacias = read_all_tablas_vacias()
+#print("tablas******************************",tablas_vacias)
+
 def read_all_Enum_in_imports():
     """Lee todos los imports desde el archivo generado y los devuelve como un diccionario."""
     imports_dict = {
@@ -67,7 +81,7 @@ def read_all_Enum_in_imports():
                     imports_dict.add(simple_type)
     return imports_dict
 simple_types = read_all_Enum_in_imports()
-print("simple_types>>>>>>>>>>>>>>>>>>>>>>>>>>",simple_types)
+#print("simple_types>>>>>>>>>>>>>>>>>>>>>>>>>>",simple_types)
 # Al inicio del script, después de definir las constantes
 
 #print("allimports",all_imports)
@@ -76,16 +90,28 @@ def agregar_dto(arg):
       return arg + 'Dto'
     return arg
 
+#validar si no se debe mappear entidades de tablas vacias
+def validar_tablas_vacias(node):
+    if node in tablas_vacias:
+        return True
+    return False 
 
 def format_type(node):
+    
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type(arg.type) for arg in node.arguments if arg.type is not None]
             generic_args = ", ".join(args)
+            if validar_tablas_vacias(generic_args):
+                return f"{node.name}<{generic_args}>"
             return f"{node.name}<{agregar_dto(generic_args)}>"
         if node.dimensions:
             # Handle arrays, even when ArrayType is not a separate class
+            if validar_tablas_vacias(node.name):
+                return f"{node.name}{'[]' * len(node.dimensions)}"
             return f"{agregar_dto(node.name)}{'[]' * len(node.dimensions)}"
+        if validar_tablas_vacias(node.name):
+            return node.name
         return agregar_dto(node.name)
     elif isinstance(node, javalang.tree.BasicType):
         return node.name
@@ -101,22 +127,26 @@ def agregar_mapper(arg):
 
 def format_type_to_mapper(node):
     mappper = ""
+    #print("node************",node)
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
             generic_args = ", ".join(args)
             mappper = generic_args
-    elif isinstance(node, javalang.tree.BasicType):
-        mappper = node.name
+        else:
+            mappper = node.name
     else:
         mappper = str(node)
-    if mappper in all_imports:
-      return mappper + 'Mapper'
+    
+    if mappper in all_imports and not mappper in tablas_vacias:
+        #print("mappper************",mappper) 
+        return mappper + 'Mapper'
     return None
 
 
 def format_type_to_mapper_toDto(node):
     mappper = ""
+    
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
@@ -128,6 +158,7 @@ def format_type_to_mapper_toDto(node):
         mappper = node.name
     else:
         mappper = str(node)
+       
     if mappper in all_imports:
       return 'toDto'
     return None
@@ -156,8 +187,8 @@ def format_type_param(node):
 def get_service_methods(service_path):
     methods_info = []
     package_name = None
-    mappers = []
-
+    mappers = set()
+    
     with open(service_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
@@ -169,6 +200,13 @@ def get_service_methods(service_path):
 
     for _, node in tree.filter(javalang.tree.MethodDeclaration):
         return_type = format_type(node.return_type)
+        excepciones = []
+        method_name = node.name
+        if node.throws:
+            
+            for tr in node.throws:
+                excepciones = tr
+            
         params = []
         complex_params = []
         params_all = []
@@ -206,11 +244,46 @@ def get_service_methods(service_path):
 
         if mapper_service:
             mapper_name = mapper_service[0].lower() + mapper_service[1:]
-            mappers.append((mapper_service, mapper_name))
+            mappers.add((mapper_service, mapper_name))
+        
+        methods_info.append((method_name, node.name, return_type, params, http_method,complex_params,params_all,(mapper_name,format_type_to_mapper_toDto(node.return_type)), excepciones))
+        
+    
+    return package_name, validar_metodos_duplicados(methods_info), mappers
 
-        methods_info.append((node.name, return_type, params, http_method,complex_params,params_all,(mapper_name,format_type_to_mapper_toDto(node.return_type))))
+def validar_metodos_duplicados(methods_info):
+    ###inicio
+    vistos = set()
 
-    return package_name, methods_info, mappers
+    # Lista para almacenar los métodos sin duplicados
+    methods_info_sin_duplicados = []
+
+    for method_info in methods_info:
+        metodo_name, node_name, return_type, params, http_method, complex_params, params_all, (map_name, format_mapper), excepciones = method_info
+
+        # Crear una tupla con las características relevantes
+        caracteristicas = (return_type, tuple(params), node_name)
+
+        # Verificar si ya hemos visto estas características antes
+        if caracteristicas not in vistos:
+            # Agregar las características al conjunto de métodos vistos
+            vistos.add(caracteristicas)
+
+            # Agregar el método a la lista sin duplicados
+            methods_info_sin_duplicados.append(method_info)
+    ##fin
+    return methods_info_sin_duplicados
+
+def cambiar_nombre_metodo_ya_definido(methods_info):
+    
+    vistos = set()
+    for method_info in methods_info:
+        method_name, node_name, return_type, params, http_method, complex_params, params_all, (map_name, format_mapper), excepciones = method_info
+        caracteristicas = (tuple(params), node_name)
+        if caracteristicas in vistos:
+            vistos.add(caracteristicas)
+            return True
+    return False
 
 def adjust_method_paths(methods_info):
     """
@@ -220,7 +293,7 @@ def adjust_method_paths(methods_info):
     path_counts = defaultdict(int)
     adjusted_methods = []
 
-    for method, return_type, params, http_method, complex_params, params_all, toDto in methods_info:
+    for method_name, method, return_type, params, http_method, complex_params, params_all, toDto, excepciones in methods_info:
         # Generar la ruta base del método (puede ser simplemente el nombre del método)
         base_path = method
         path_counts[base_path] += 1
@@ -229,11 +302,13 @@ def adjust_method_paths(methods_info):
         if path_counts[base_path] > 1:
             # Añadir el sufijo de versión si la ruta está duplicada
             versioned_path = f"{base_path}/v{path_counts[base_path]}"
+            if cambiar_nombre_metodo_ya_definido(methods_info):
+                method_name = f"{method_name}V{path_counts[base_path]}"
         else:
             versioned_path = base_path
-
+        
         # Añadir la información del método ajustado a la lista
-        adjusted_methods.append((method, return_type, params, http_method,complex_params, params_all, versioned_path,toDto))
+        adjusted_methods.append((method_name, method, return_type, params, http_method,complex_params, params_all, versioned_path,toDto,excepciones))
 
     return adjusted_methods
 

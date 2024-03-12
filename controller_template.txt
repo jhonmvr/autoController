@@ -16,11 +16,11 @@ public class {{ controller_name }} {
     protected {{ service }} {{ name }};
     {% endfor %}
 
-    {% for method, return_type, params, http_method, complex_params, params_all, path, (nameMapper, tDto) in methods %}
+    {% for method_name, method, return_type, params, http_method, complex_params, params_all, path, (nameMapper, tDto), excepciones in methods %}
     @{{ http_method }}Mapping("/{{ path }}")
-    public {{ return_type if return_type else 'void' }} {{ method }}({% for param_type, param_name, annotation in params %}
-        {{ annotation }} {{ param_type }} {{ param_name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
-
+    public {{ return_type if return_type else 'void' }} {{ method_name }}({% for param_type, param_name, annotation in params %}
+        {{ annotation }} {{ param_type }} {{ param_name }}{% if not loop.last %},
+        {% endif %}{% endfor %}) {% if excepciones %} throws {{excepciones}} {% endif %}       {
         {% if complex_params|length > 1 %}
             // Desempaquetado de 'body' para parametros complejos
         {% for tipo, nombre in complex_params %}
@@ -40,16 +40,14 @@ public class {{ controller_name }} {
         {% else %}
         {% if return_type and return_type != 'void' %}
         {% if nameMapper %}
-        return {{nameMapper}}.{{tDto}}(service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}));
+        return {{nameMapper}}.{{tDto}}(service.{{ method }}({% for _, name, _ in params_all %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}));
         {% else %}
-        return service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
+        return service.{{ method }}({% for _, name, _ in params_all %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
         {% endif %}
-
         {% else %}
-        service.{{ method }}({% for _, name, _ in params %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
+        service.{{ method }}({% for _, name, _ in params_all %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %});
         {% endif %}
         {% endif %}
-
     }
     {% endfor %}
 }
