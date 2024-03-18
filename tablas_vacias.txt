@@ -517,3 +517,8 @@ CrdGruposMoraDTO
 VwGestionCreditoDTO
 CrdCreditoDTO
 RepDinamicCpsItemTMP
+VwGestionCreditoReporte
+VwGestionCredito
+VwCiclosHistoricoCredito
+CrdTipoGestion
+CrdTipoEjecutivo

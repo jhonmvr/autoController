@@ -5,7 +5,7 @@ from jinja2 import Environment, FileSystemLoader
 import javalang
 from collections import defaultdict
 SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\'
-CONTROLLER_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-rest\\src\\main\\java\\com\\erp\\controller\\gestor\\bdg'
+CONTROLLER_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-rest\\src\\main\\java\\com\\erp\\controller\\servicios'
 #com.erp.controller.gestor.bdg;
 FILE_IMPORTS = './imports.txt'
 #METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO

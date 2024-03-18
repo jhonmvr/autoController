@@ -8,7 +8,7 @@ from collections import defaultdict
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\erp-rest\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
+SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios'
 #SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios\\bdg'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
@@ -94,10 +94,10 @@ def agregar_dto(arg):
 def validar_tablas_vacias(node):
     if node in tablas_vacias:
         return True
-    return False 
+    return False
 
 def format_type(node):
-    
+
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type(arg.type) for arg in node.arguments if arg.type is not None]
@@ -137,16 +137,16 @@ def format_type_to_mapper(node):
             mappper = node.name
     else:
         mappper = str(node)
-    
+
     if mappper in all_imports and not mappper in tablas_vacias:
-        #print("mappper************",mappper) 
+        #print("mappper************",mappper)
         return mappper + 'Mapper'
     return None
 
 
 def format_type_to_mapper_toDto(node):
     mappper = ""
-    
+
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
@@ -158,7 +158,7 @@ def format_type_to_mapper_toDto(node):
         mappper = node.name
     else:
         mappper = str(node)
-       
+
     if mappper in all_imports:
       return 'toDto'
     return None
@@ -188,7 +188,7 @@ def get_service_methods(service_path):
     methods_info = []
     package_name = None
     mappers = set()
-    
+
     with open(service_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
@@ -203,10 +203,10 @@ def get_service_methods(service_path):
         excepciones = []
         method_name = node.name
         if node.throws:
-            
+
             for tr in node.throws:
                 excepciones = tr
-            
+
         params = []
         complex_params = []
         params_all = []
@@ -245,10 +245,10 @@ def get_service_methods(service_path):
         if mapper_service:
             mapper_name = mapper_service[0].lower() + mapper_service[1:]
             mappers.add((mapper_service, mapper_name))
-        
+
         methods_info.append((method_name, node.name, return_type, params, http_method,complex_params,params_all,(mapper_name,format_type_to_mapper_toDto(node.return_type)), excepciones))
-        
-    
+
+
     return package_name, validar_metodos_duplicados(methods_info), mappers
 
 def validar_metodos_duplicados(methods_info):
@@ -275,7 +275,7 @@ def validar_metodos_duplicados(methods_info):
     return methods_info_sin_duplicados
 
 def cambiar_nombre_metodo_ya_definido(methods_info):
-    
+
     vistos = set()
     for method_info in methods_info:
         method_name, node_name, return_type, params, http_method, complex_params, params_all, (map_name, format_mapper), excepciones = method_info
@@ -306,7 +306,7 @@ def adjust_method_paths(methods_info):
                 method_name = f"{method_name}V{path_counts[base_path]}"
         else:
             versioned_path = base_path
-        
+
         # Añadir la información del método ajustado a la lista
         adjusted_methods.append((method_name, method, return_type, params, http_method,complex_params, params_all, versioned_path,toDto,excepciones))
 
@@ -353,7 +353,7 @@ for root, dirs, files in os.walk(SERVICE_DIR):
             service_name = service_file[:-5]  # Sin '.java'
             # 'N' por 'C' Servicio
             if service_name.startswith('Servicio'):
-                controller_name = 'C' + service_name[8:]
+                controller_name = 'C' + service_name
             if service_name.startswith('N'):
                 controller_name = 'C' + service_name[1:]
 
