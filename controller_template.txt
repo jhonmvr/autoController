@@ -50,4 +50,66 @@ public class {{ controller_name }} {
         {% endif %}
     }
     {% endfor %}
+
+    {% if generic_type %}
+    {% if generic_type_mappper_name %}
+    @GetMapping("/get")
+    public {{generic_type}} get(@RequestParam("id") Long id) {
+
+        return {{generic_type_mappper_name}}.toDto(service.get(id));
+    }
+    @GetMapping("/load")
+    public {{generic_type}} load(@RequestParam("id") Long id) {
+        return {{generic_type_mappper_name}}.toDto(service.load(id));
+    }
+
+    @GetMapping("/getAll")
+    public List<{{generic_type}}> getAll() {
+        return {{generic_type_mappper_name}}.toDtoList(service.getAll());
+    }
+
+    @PostMapping("/create")
+    public void create(@RequestBody {{generic_type_param}} entity) {
+        service.create(entity);
+    }
+
+    @PostMapping("/saveOrUpdate")
+    public {{generic_type}} saveOrUpdate(@RequestBody {{generic_type_param}} entity) {
+        return {{generic_type_mappper_name}}.toDto(service.update(entity));
+    }
+    @PostMapping("/update")
+    public {{generic_type}} update(@RequestBody {{generic_type_param}} entity) {
+        return {{generic_type_mappper_name}}.toDto(service.update(entity));
+    }
+    {% else %}
+    @GetMapping("/get")
+    public {{generic_type}} get(@RequestParam("id") Long id) {
+
+        return service.get(id);
+    }
+    @GetMapping("/load")
+    public {{generic_type}} load(@RequestParam("id") Long id) {
+        return service.load(id);
+    }
+
+    @GetMapping("/getAll")
+    public List<{{generic_type}}> getAll() {
+        return service.getAll();
+    }
+
+    @PostMapping("/create")
+    public void create(@RequestBody {{generic_type_param}} entity) {
+        service.create(entity);
+    }
+
+    @PostMapping("/saveOrUpdate")
+    public {{generic_type}} saveOrUpdate(@RequestBody {{generic_type_param}} entity) {
+        return service.update(entity);
+    }
+    @PostMapping("/update")
+    public {{generic_type}} update(@RequestBody {{generic_type_param}} entity) {
+        return service.update(entity);
+    }
+    {% endif %}
+    {% endif %}
 }

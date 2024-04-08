@@ -4,8 +4,7 @@ import inspect
 from jinja2 import Environment, FileSystemLoader
 import javalang
 from collections import defaultdict
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\'
-CONTROLLER_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-rest\\src\\main\\java\\com\\erp\\controller\\servicios'
+CONTROLLER_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-rest\\src\\main\\java\\com\\erp\\controller\\gestor'
 #com.erp.controller.gestor.bdg;
 FILE_IMPORTS = './imports.txt'
 #METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO
@@ -17,7 +16,9 @@ def read_all_imports():
             # Asume que el archivo tiene líneas que comienzan con 'import ' seguido por el tipo completo
             if line.startswith('import '):
                 full_type = line.strip().split(' ')[1].rstrip(';')
+                #print("full_type=============",full_type)
                 simple_type = full_type.split('.')[-1]
+                #print("simple_type=============",simple_type)
                 imports_dict[simple_type] = full_type
     return imports_dict
 
@@ -36,6 +37,7 @@ def find_data_types_in_controller(controller_path):
             content = file.read()
 
     tokens = list(javalang.tokenizer.tokenize(content))
+
     for token in tokens:
         if isinstance(token, javalang.tokenizer.Identifier):
             data_types.add(token.value)
@@ -43,11 +45,15 @@ def find_data_types_in_controller(controller_path):
 
 
 def add_imports_to_controller(controller_path, all_imports):
+
     """Añade imports necesarios a un archivo de controlador."""
     data_types = find_data_types_in_controller(controller_path)
+
     necessary_imports = set()
     for data_type in data_types:
+        #print("data_type===========>",data_type)
         if data_type in all_imports:
+            #print("tokens===========>",data_type)
             necessary_imports.add(all_imports[data_type])
 
     # Leer el contenido original del controlador

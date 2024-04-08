@@ -9,7 +9,7 @@ from collections import defaultdict
 
 # Configuración
 SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
-#SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios\\bdg'
+#SERVICE_DIR = 'C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\crd\cobranzas'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
 base_dir = SERVICE_DIR.split('erp-negocio')[0]  # Obtiene la base hasta 'erp-negocio'
@@ -19,37 +19,18 @@ specific_part = SERVICE_DIR.split('erp-negocio\\src\\main\\java\\')[1]  # Obtien
 specific_part = specific_part.replace('negocio', 'controller')
 
 # Paso 3: Construir el nuevo directorio para CONTROLLER_DIR
-CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
+#CONTROLLER_DIR = os.path.join(base_dir, 'erp-rest\\src\\main\\java', specific_part)
 FILE_IMPORTS = './imports.txt'
 FILE_TABLAS_VACIAS = './tablas_vacias.txt'
 #CONTROLLER_DIR = "./repuest"
-print(CONTROLLER_DIR)
+#print(CONTROLLER_DIR)
 
 
-TEMPLATE_FILE = 'controller_template.txt'  # Nombre del archivo de plantilla
+TEMPLATE_FILE = 'cliente_rest_template.txt'  # Nombre del archivo de plantilla
 sys.path.append(SERVICE_DIR)
 # Cargar plantilla
 env = Environment(loader=FileSystemLoader('.'), trim_blocks=True, lstrip_blocks=True)
 template = env.get_template(TEMPLATE_FILE)
-
-def extract_generic_info(java_source):
-    with open(java_source, 'r', encoding='utf-8') as file:
-        content = file.read()
-    tree = javalang.parse.parse(content)
-    base_class_name = None
-    generic_type_name = None
-    for _, class_decl in tree.filter(javalang.tree.InterfaceDeclaration):
-        if class_decl.extends:
-            base_reference_type = class_decl.extends[0]
-            base_class_name = base_reference_type.name
-            if base_reference_type.arguments:
-                first_argument = base_reference_type.arguments[0]
-                if isinstance(first_argument.type, javalang.tree.ReferenceType):
-                    generic_type_name = first_argument.type.name
-
-
-
-    return base_class_name, generic_type_name
 
 #METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO
 def read_all_imports():
@@ -116,23 +97,32 @@ def validar_tablas_vacias(node):
     return False
 
 def format_type(node):
-
+    lista_fix ={}
+    lista_fix["int"]="Integer"
+    lista_fix["long"]="Long"
+    lista_fix["boolean"]="Boolean"
+    lista_fix["byte"]="Byte"
+    lista_fix["java"]="java.sql.Date"
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
             args = [format_type(arg.type) for arg in node.arguments if arg.type is not None]
             generic_args = ", ".join(args)
             if validar_tablas_vacias(generic_args):
                 return f"{node.name}<{generic_args}>"
-            return f"{node.name}<{agregar_dto(generic_args)}>"
+            if not generic_args:
+                return f"{node.name}<?>"
+            return f"{node.name}<{generic_args}>"
         if node.dimensions:
             # Handle arrays, even when ArrayType is not a separate class
             if validar_tablas_vacias(node.name):
                 return f"{node.name}{'[]' * len(node.dimensions)}"
-            return f"{agregar_dto(node.name)}{'[]' * len(node.dimensions)}"
+            return f"{node.name}{'[]' * len(node.dimensions)}"
         if validar_tablas_vacias(node.name):
             return node.name
-        return agregar_dto(node.name)
+        return node.name
     elif isinstance(node, javalang.tree.BasicType):
+        if node.name in lista_fix:
+            return lista_fix[node.name]
         return node.name
     elif node is None:
         return 'void'
@@ -164,7 +154,7 @@ def format_type_to_mapper(node):
 
 
 def format_type_to_mapper_toDto(node):
-    mappper = ""
+
 
     if isinstance(node, javalang.tree.ReferenceType):
         if node.arguments:
@@ -188,16 +178,23 @@ def format_type_param(node):
         if node.arguments:
             args = [format_type_param(arg.type) for arg in node.arguments if arg.type is not None]
             generic_args = ", ".join(args)
+            if not generic_args:
+                return f"{node.name}<?>"
             return f"{node.name}<{generic_args}>"
         if node.dimensions:
             # Handle arrays, even when ArrayType is not a separate class
             return f"{node.name}{'[]' * len(node.dimensions)}"
+        if node.name =='java':
+                return 'java.sql.Date'
         return node.name
     elif isinstance(node, javalang.tree.BasicType):
+        if node.name =='java':
+            return 'java.sql.Date'
         return node.name
     elif node is None:
         return 'void'
     else:
+
         return str(node)
 
 
@@ -246,16 +243,16 @@ def get_service_methods(service_path):
             # Deberías crear un DTO que encapsule estos parámetros en tu código Java.
             annotation = "@RequestBody"
             params.append(("Map<String, Object>", "body", annotation))
-            http_method = "Post"
+            http_method = "HttpMethod.POST"
         elif len(complex_params) == 1:
             # Solo un parámetro complejo, se maneja normalmente
             param_type, param_name = complex_params[0]
             annotation = "@RequestBody"
             params.append((param_type, param_name, annotation))
-            http_method = "Post"
+            http_method = "HttpMethod.POST"
         else:
             # No hay parámetros complejos o solo uno, determinar el método HTTP basado en los parámetros existentes
-            http_method = "Get"
+            http_method = "HttpMethod.GET"
 
 
         mapper_service = format_type_to_mapper(node.return_type)
@@ -361,65 +358,44 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 continue
 
             # A continuación, calculamos CONTROLLER_DIR basado en package_name
-            package_path = package_name.replace('.', '\\')  # Convertir el nombre del paquete a ruta de directorio
-            dynamic_controller_dir = os.path.join(base_dir, 'erp-rest\\src\\main\\java', package_path.replace('negocio', 'controller'))
+            package_path = package_name.replace('.', '\\')
+            # Convertir el nombre del paquete a ruta de directorio
+            #C:\WORKSPACE\erp-rest\erp-web\src\main\java\com\erp\cliente\rest\gestor\cmd\CRPortalCliente.java
+            #dynamic_controller_dir = os.path.join(base_dir, 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
+            dynamic_controller_dir = os.path.join('./prueba/', 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
 
             if not os.path.exists(dynamic_controller_dir):
                 os.makedirs(dynamic_controller_dir)
 
 
-            controller_package = package_name.replace('negocio', 'controller')
+            controller_package = package_name.replace('negocio', 'cliente.rest')
             service_name = service_file[:-5]  # Sin '.java'
             # 'N' por 'C' Servicio
+            if service_name.startswith('Servicio'):
+                cliente_controller_name = service_name + 'Client'
+            if service_name.startswith('N'):
+                cliente_controller_name = service_name[1:] + 'Client'
+
             if service_name.startswith('Servicio'):
                 controller_name = service_name + 'Controller'
             if service_name.startswith('N'):
                 controller_name = service_name[1:] + 'Controller'
 
-
-            request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name
-            request_mapping = request_mapping.split('controller')[1]
+            request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name+ '/'
+            request_mapping = request_mapping.split('rest')[1]
             adjusted_methods = adjust_method_paths(methods)
-
-            #buscar GenericoServicio
-            generic_type_param = None
-            generic_type_mappper_name = None
-            base_class, generic_type = extract_generic_info(service_path)
-            if generic_type:
-
-                generic_type_param = generic_type
-                generic_type_mappper = generic_type + 'Mapper'
-                generic_type_mappper_name = None
-                if not validar_tablas_vacias(generic_type):
-                    generic_type_mappper_name = generic_type_mappper[0].lower() + generic_type_mappper[1:]
-                    mappers.add((generic_type_mappper, generic_type_mappper_name))
-                    generic_type = agregar_dto(generic_type)
-
-                    #print("mapper-------",mappers)
-
-                methods.append(("get", "get", [("id", "Long", '@RequestParam("id")')], "GET", [], [("id", "Long", "")], (generic_type_mappper_name, "toDto"), []))
-                methods.append(("load", "load", generic_type, [("id", "Long", '@RequestParam("id")')], "GET", [], [("id", "Long", "")], (generic_type_mappper_name, "toDto"), []))
-                methods.append(("getAll", "getAll", "List<{{generic_type}}>", [], "GET", [], [], (generic_type_mappper_name, "toDtoList"), []))
-                methods.append(("create", "create", "void", [("entity", generic_type_param, "@RequestBody")], "POST", [("entity", generic_type_param)], [("entity", generic_type_param, "")], (None, None), []))
-                methods.append(("saveOrUpdate", "saveOrUpdate", generic_type, [("entity", generic_type_param, "@RequestBody")], "POST", [("entity", generic_type_param)], [("entity", generic_type_param, "")], (generic_type_mappper_name, "toDto"), []))
-                methods.append(("update", "update",  generic_type, [("entity", generic_type_param, "@RequestBody")], "POST", [("entity", generic_type_param)], [("entity", generic_type_param, "")], (generic_type_mappper_name, "toDto"), []))
-
             # Renderizar plantilla
             controller_content = template.render(
                 package=controller_package,
-                controller_name=controller_name,
+                controller_name=cliente_controller_name,
                 service_name=service_name,
                 request_mapping=request_mapping,
                 methods=adjusted_methods,
-                mappers= mappers,
-                base_class= base_class,
-                generic_type= generic_type,
-                generic_type_param= generic_type_param,
-                generic_type_mappper_name= generic_type_mappper_name
+                mappers= mappers
             )
 
             # Guardar archivo de controlador generado en la ruta dinámica
-            with open(os.path.join(dynamic_controller_dir, controller_name + '.java'), 'w') as f:
+            with open(os.path.join(dynamic_controller_dir, cliente_controller_name + '.java'), 'w') as f:
                 f.write(controller_content)
             print(f'Controlador generado: {controller_name}.java en {dynamic_controller_dir}')
 

@@ -1,0 +1,75 @@
+package {{ package }};
+
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import static com.erp.presentacion.web.app.ErpWebSesion.URL_REST_CLIENT;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.core.ParameterizedTypeReference;
+
+@Service
+public class {{ controller_name }} {
+
+    private static final String URL = URL_REST_CLIENT + "{{ request_mapping }}";
+
+
+    {% for method_name, method, return_type, params, http_method, complex_params, params_all, path, (nameMapper, tDto), excepciones in methods %}
+    public {{ return_type if return_type else 'void' }} {{ method_name }}({%for param_type, name, _ in params_all %}{{ param_type }} {{ name }}{% if not loop.last %},
+            {% endif %}{% endfor %})        {
+        try {
+            String urlWithParams = URL + "{{ path }}";
+            RestTemplate restTemplate = new RestTemplate();
+            restTemplate.setErrorHandler(new RestTemplateResponseErrorHandler());
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(urlWithParams);
+            {% if params|length > 0 %}
+            {% for param_type, param_name, annotation in params %}
+            {% if annotation == '@RequestBody' %}
+            {% if param_type == 'Map<String, Object>' %}
+            Map<String, Object> requestBody = new HashMap<>();
+            {% for tipo, nombre in complex_params %}
+            requestBody.put("{{ nombre }}", {{ nombre }});
+            {% endfor %}
+            HttpEntity<{{param_type}}> requestEntity = new HttpEntity<>(requestBody,headers);
+            {% else %}
+            HttpEntity<{{param_type}}> requestEntity = new HttpEntity<>({{param_name}},headers);
+            {% endif %}
+            {% else %}
+            builder.queryParam("{{param_name}}", {{param_name}});
+            {% endif %}
+            {% endfor %}
+            {% endif %}
+            {% if complex_params|length == 0 %}
+            HttpEntity<Void> requestEntity = new HttpEntity<>(null,headers);
+            {% endif %}
+            {% if return_type and return_type != 'void' %}
+            ResponseEntity<{{return_type}}> response = restTemplate.exchange(
+            builder.toUriString(),
+            {{http_method}},
+            requestEntity,
+            new ParameterizedTypeReference<{{return_type}}>() {}
+            );
+            {% else %}
+            ResponseEntity<Void> response = restTemplate.exchange(
+            builder.toUriString(),
+            {{http_method}},
+            requestEntity,
+            Void.class
+            );
+            {% endif %}
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new ERPPersistenciaExcepcion("No se puede consumir el servicio {{ path }}");
+            }
+            {% if return_type and return_type != 'void' %}
+            return response.getBody();
+            {% endif %}
+        }catch (ERPPersistenciaExcepcion e) {
+            throw e;
+        }catch (Exception e) {
+            e.printStackTrace();
+            throw new ERPPersistenciaExcepcion(e.getMessage());
+        }
+    }
+    {% endfor %}
+}

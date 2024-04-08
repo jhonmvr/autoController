@@ -522,3 +522,4 @@ VwGestionCredito
 VwCiclosHistoricoCredito
 CrdTipoGestion
 CrdTipoEjecutivo
+CrdGruposMoraRegionEjecutivo
