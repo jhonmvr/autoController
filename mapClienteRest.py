@@ -381,6 +381,8 @@ for root, dirs, files in os.walk(SERVICE_DIR):
             if service_name.startswith('N'):
                 controller_name = service_name[1:] + 'Controller'
 
+
+
             request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name+ '/'
             request_mapping = request_mapping.split('rest')[1]
             adjusted_methods = adjust_method_paths(methods)

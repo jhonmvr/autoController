@@ -24,7 +24,15 @@ public class {{ controller_name }} {
         {% if complex_params|length > 1 %}
             // Desempaquetado de 'body' para parametros complejos
         {% for tipo, nombre in complex_params %}
+        {% if tipo == 'Date' %}
+        {{ tipo }} {{ nombre }} = UtilCast.castToDate(body.get("{{ nombre }}"));
+        {% elif tipo == 'Timestamp' %}
+        {{ tipo }} {{ nombre }} = UtilCast.castToTimestamp(body.get("{{ nombre }}"));
+        {% elif tipo == 'java' %}
+        java.sql.Date {{ nombre }} = UtilCast.castToDateSQL(body.get("{{ nombre }}"));
+        {% else %}
         {{ tipo }} {{ nombre }} = ({{ tipo }}) body.get("{{ nombre }}");
+        {% endif %}
         {% endfor %}
         {% endif %}
         {% if complex_params|length > 1 %}
@@ -53,63 +61,9 @@ public class {{ controller_name }} {
 
     {% if generic_type %}
     {% if generic_type_mappper_name %}
-    @GetMapping("/get")
-    public {{generic_type}} get(@RequestParam("id") Long id) {
-
-        return {{generic_type_mappper_name}}.toDto(service.get(id));
-    }
-    @GetMapping("/load")
-    public {{generic_type}} load(@RequestParam("id") Long id) {
-        return {{generic_type_mappper_name}}.toDto(service.load(id));
-    }
-
-    @GetMapping("/getAll")
-    public List<{{generic_type}}> getAll() {
-        return {{generic_type_mappper_name}}.toDtoList(service.getAll());
-    }
-
-    @PostMapping("/create")
-    public void create(@RequestBody {{generic_type_param}} entity) {
-        service.create(entity);
-    }
-
-    @PostMapping("/saveOrUpdate")
-    public {{generic_type}} saveOrUpdate(@RequestBody {{generic_type_param}} entity) {
-        return {{generic_type_mappper_name}}.toDto(service.update(entity));
-    }
-    @PostMapping("/update")
-    public {{generic_type}} update(@RequestBody {{generic_type_param}} entity) {
-        return {{generic_type_mappper_name}}.toDto(service.update(entity));
-    }
+   //va con mapper
     {% else %}
-    @GetMapping("/get")
-    public {{generic_type}} get(@RequestParam("id") Long id) {
-
-        return service.get(id);
-    }
-    @GetMapping("/load")
-    public {{generic_type}} load(@RequestParam("id") Long id) {
-        return service.load(id);
-    }
-
-    @GetMapping("/getAll")
-    public List<{{generic_type}}> getAll() {
-        return service.getAll();
-    }
-
-    @PostMapping("/create")
-    public void create(@RequestBody {{generic_type_param}} entity) {
-        service.create(entity);
-    }
-
-    @PostMapping("/saveOrUpdate")
-    public {{generic_type}} saveOrUpdate(@RequestBody {{generic_type_param}} entity) {
-        return service.update(entity);
-    }
-    @PostMapping("/update")
-    public {{generic_type}} update(@RequestBody {{generic_type_param}} entity) {
-        return service.update(entity);
-    }
+    //va sin mapper
     {% endif %}
     {% endif %}
 }

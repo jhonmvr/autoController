@@ -523,3 +523,7 @@ VwCiclosHistoricoCredito
 CrdTipoGestion
 CrdTipoEjecutivo
 CrdGruposMoraRegionEjecutivo
+Ticket
+VwSegUsuarioGrupoActualizar
+CrdParametro
+CrdTiposParametros
