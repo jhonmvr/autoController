@@ -8,7 +8,7 @@ from collections import defaultdict
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
+SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios'
 #SERVICE_DIR = 'C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\crd\cobranzas'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
@@ -32,6 +32,24 @@ sys.path.append(SERVICE_DIR)
 env = Environment(loader=FileSystemLoader('.'), trim_blocks=True, lstrip_blocks=True)
 template = env.get_template(TEMPLATE_FILE)
 
+def extract_generic_info(java_source):
+    with open(java_source, 'r', encoding='utf-8') as file:
+        content = file.read()
+    tree = javalang.parse.parse(content)
+    base_class_name = None
+    generic_type_name = None
+    for _, class_decl in tree.filter(javalang.tree.InterfaceDeclaration):
+        if class_decl.extends:
+            base_reference_type = class_decl.extends[0]
+            base_class_name = base_reference_type.name
+            if base_reference_type.arguments:
+                first_argument = base_reference_type.arguments[0]
+                if isinstance(first_argument.type, javalang.tree.ReferenceType):
+                    generic_type_name = first_argument.type.name
+
+
+
+    return base_class_name, generic_type_name
 #METODO QUE LEE TODOS LOS IMPORTS DEL ARCHIVO PLANO
 def read_all_imports():
     """Lee todos los imports desde el archivo generado y los devuelve como un diccionario."""
@@ -353,16 +371,14 @@ for root, dirs, files in os.walk(SERVICE_DIR):
 
             package_name, methods, mappers = get_service_methods(service_path)
 
-            if not methods:  # Si no hay métodos, continúa con el siguiente archivo
-                print(f"No se encontraron métodos en {service_file}, omitiendo...")
-                continue
+
 
             # A continuación, calculamos CONTROLLER_DIR basado en package_name
             package_path = package_name.replace('.', '\\')
             # Convertir el nombre del paquete a ruta de directorio
             #C:\WORKSPACE\erp-rest\erp-web\src\main\java\com\erp\cliente\rest\gestor\cmd\CRPortalCliente.java
-            #dynamic_controller_dir = os.path.join(base_dir, 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
-            dynamic_controller_dir = os.path.join('./prueba/', 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
+            dynamic_controller_dir = os.path.join(base_dir, 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
+            #dynamic_controller_dir = os.path.join('./prueba/', 'erp-web\\src\\main\\java', package_path.replace('negocio', 'cliente\\rest'))
 
             if not os.path.exists(dynamic_controller_dir):
                 os.makedirs(dynamic_controller_dir)
@@ -383,9 +399,55 @@ for root, dirs, files in os.walk(SERVICE_DIR):
 
 
 
+            if controller_name == 'VentasDiarioCuadreCajaController' and 'Ctb' in  controller_package:
+                controller_name = 'VentasDiarioCuadreCajaCtbController'
+                cliente_controller_name = service_name + 'Ctb' + 'Client'
+            if controller_name == 'ServicioRayadosAbolladosController' and 'gvt' in  controller_package:
+                controller_name = 'ServicioRayadosAbolladosGvtController'
+                cliente_controller_name = service_name + 'Gvt' + 'Client'
+            if controller_name == 'ServicioVentaController' and 'cambioautorizado' in  controller_package:
+                controller_name = 'ServicioVentaCambioController'
+                cliente_controller_name = service_name + 'Cambio' + 'Client'
+
+
             request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name+ '/'
             request_mapping = request_mapping.split('rest')[1]
             adjusted_methods = adjust_method_paths(methods)
+
+             #buscar GenericoServicio
+            generic_type_param = None
+            generic_type_mappper_name = None
+            base_class, generic_type = extract_generic_info(service_path)
+            #print("generic_type-------",generic_type)
+            if not methods and not generic_type:  # Si no hay métodos, continúa con el siguiente archivo
+                print(f"No se encontraron métodos en {service_file}, omitiendo...")
+                continue
+
+            if generic_type:
+
+                generic_type_param = generic_type
+                generic_type_mappper = generic_type + 'Mapper'
+                generic_type_mappper_name = None
+                if not validar_tablas_vacias(generic_type):
+                    generic_type_mappper_name = generic_type_mappper[0].lower() + generic_type_mappper[1:]
+                    mappers.add((generic_type_mappper, generic_type_mappper_name))
+                    generic_type = generic_type
+
+
+                #print("methods=========>",adjusted_methods)
+                metodos_a_agregar = [
+                                        ("get", "get", generic_type, [("Long","id",  '@RequestParam("id")')], "HttpMethod.GET", [], [("Long","id",  "")], "get", (generic_type_mappper_name, "toDto"), []),
+                                        ("load", "load", generic_type, [("Long","id",  '@RequestParam("id")')], "HttpMethod.GET", [], [("Long", "id",  "")], "load", (generic_type_mappper_name, "toDto"), []),
+                                        ("getAll", "getAll", "List<"+generic_type+">", [], "HttpMethod.GET", [], [], "getAll", (generic_type_mappper_name, "toDtoList"), []),
+                                        ("create", "create", "void", [(generic_type_param, "entity", "@RequestBody")], "HttpMethod.POST", [("entity", generic_type_param)], [(generic_type_param, "entity", "")], "create", (None, None), []),
+                                        ("saveOrUpdate", "saveOrUpdate", "void", [(generic_type_param, "entity", "@RequestBody")], "HttpMethod.POST", [("entity", generic_type_param)], [(generic_type_param, "entity", "")], "saveOrUpdate", (generic_type_mappper_name, "toDto"), []),
+                                        ("update", "update", generic_type, [(generic_type_param, "entity", "@RequestBody")], "HttpMethod.POST", [("entity", generic_type_param)], [(generic_type_param, "entity", "")], "update", (generic_type_mappper_name, "toDto"), [])
+                                    ]
+
+                # Verificar si cada método ya existe en adjusted_methods por nombre de método
+                for metodo_a_agregar in metodos_a_agregar:
+                    if not any(metodo[0] == metodo_a_agregar[0] for metodo in adjusted_methods):
+                        adjusted_methods.append(metodo_a_agregar)
             # Renderizar plantilla
             controller_content = template.render(
                 package=controller_package,

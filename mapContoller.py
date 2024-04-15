@@ -8,7 +8,7 @@ from collections import defaultdict
 #sys.path.append('C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor\\web')
 
 # Configuración
-SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios'
+SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\gestor'
 #SERVICE_DIR = 'C:\\WORKSPACE\\SUKASA\\erp\\erp-negocio\\src\\main\\java\\com\\erp\\negocio\\servicios\\bdg'
 #C:\WORKSPACE\SUKASA\erp\erp-rest\src\main\java\com\erp\controller\gestor\bdg
 # Paso 1: Extraer la base del directorio y las partes específicas
@@ -379,12 +379,12 @@ for root, dirs, files in os.walk(SERVICE_DIR):
                 controller_name = service_name[1:] + 'Controller'
 
 
-            if controller_name == 'VentasDiarioCuadreCajaController' and 'Ctb' in  controller_package:
+            if controller_name == 'VentasDiarioCuadreCajaController' and 'ctb' in  controller_package:
                 controller_name = 'VentasDiarioCuadreCajaCtbController'
             if controller_name == 'ServicioRayadosAbolladosController' and 'gvt' in  controller_package:
                 controller_name = 'ServicioRayadosAbolladosGvtController'
             if controller_name == 'ServicioVentaController' and 'cambioautorizado' in  controller_package:
-                controller_name = 'ServicioRayadosAbolladosGvtController'
+                controller_name = 'ServicioVentaCambioController'
 
             request_mapping = controller_package.replace('.', '/').lower() + '/' + controller_name
             request_mapping = request_mapping.split('controller')[1]

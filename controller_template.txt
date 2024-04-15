@@ -22,7 +22,6 @@ public class {{ controller_name }} {
         {{ annotation }} {{ param_type }} {{ param_name }}{% if not loop.last %},
         {% endif %}{% endfor %}) {% if excepciones %} throws {{excepciones}} {% endif %}       {
         {% if complex_params|length > 1 %}
-            // Desempaquetado de 'body' para parametros complejos
         {% for tipo, nombre in complex_params %}
         {% if tipo == 'Date' %}
         {{ tipo }} {{ nombre }} = UtilCast.castToDate(body.get("{{ nombre }}"));
@@ -30,6 +29,10 @@ public class {{ controller_name }} {
         {{ tipo }} {{ nombre }} = UtilCast.castToTimestamp(body.get("{{ nombre }}"));
         {% elif tipo == 'java' %}
         java.sql.Date {{ nombre }} = UtilCast.castToDateSQL(body.get("{{ nombre }}"));
+        {% elif tipo == 'List<Long>' %}
+        List<Long> {{ nombre }} = UtilCast.castToListLong((List<?>)body.get("{{ nombre }}"));
+        {% elif tipo == 'BigDecimal' %}
+        BigDecimal  {{ nombre }} = UtilCast.castToBigDecimal(body.get("{{ nombre }}"));
         {% else %}
         {{ tipo }} {{ nombre }} = ({{ tipo }}) body.get("{{ nombre }}");
         {% endif %}
